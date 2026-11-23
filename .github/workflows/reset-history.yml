@@ -1,0 +1,123 @@
+name: 重置仓库历史（初始化仓库）
+
+# ⚠️ 破坏性操作：把 main 压平成单个 root commit（message = "初始化仓库"），
+#    让旧 commit 里的密钥脱离 ref，无法再通过 git 历史翻出。
+#
+# 前提（很重要）：
+#   1. 本 workflow 只能清除"历史 commit"里的密钥，清除不了"当前文件"里的密钥。
+#      运行前必须确保当前工作树的所有文件都已脱敏。
+#   2. 因此下面的"预检"步骤会扫描当前工作树：一旦发现疑似密钥立即中止。
+#   3. 密钥一旦推送过公网，即便历史清空，GitHub 缓存 / fork / 爬虫仍可能残留。
+#      真正的收尾永远是"到签发方轮换/吊销密钥"，本 workflow 不能替代这一步。
+#
+# 触发：仅手动（workflow_dispatch）。绝不要挂 push / schedule 自动触发。
+# 权限：需要 Settings → Actions → General → Workflow permissions 设为 "Read and write"。
+# 分支保护：若 main 开启了 protect，force push 会被拒，需临时关闭或用有绕过权限的 token。
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: '确认清空全部历史（输入 RESET 才会执行）'
+        required: true
+        default: ''
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reset-history
+  cancel-in-progress: false
+
+jobs:
+  reset-history:
+    name: 清空历史并重建为初始化仓库
+    runs-on: ubuntu-latest
+    steps:
+      - name: 校验确认输入
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "RESET" ]; then
+            echo "::error::必须输入 RESET 才能执行。已中止。"
+            exit 1
+          fi
+
+      - name: 检出代码（含完整历史）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 配置 git 身份
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: 预检：当前工作树不得含疑似密钥
+        run: |
+          set -euo pipefail
+          found=0
+          flag() { echo "::error::$1"; found=1; }
+
+          # 1) PEM 私钥完整头（workflow 里的自检字符串无 ----- 前缀，不会误报）
+          #    用 -e 传模式，否则以 - 开头的模式会被 git 当成命令行选项
+          if git grep -n -I -E -e '-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----' -- . ':(exclude).github/workflows/*'; then
+            flag "当前文件含 PEM 私钥头"
+          fi
+
+          # 2) GitHub / AWS access token 特征
+          if git grep -n -I -E -e 'gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{60,}|AKIA[0-9A-Z]{16}' -- .; then
+            flag "当前文件含疑似 access token"
+          fi
+
+          # 3) 顶层鸿蒙签名配置不得入库（含签名密码）；entry/ 下的同名文件是正常构建配置，不算
+          if git ls-files | grep -qE '^ohos/build-profile(参考)?\.json5$'; then
+            flag "仓库含顶层 ohos/build-profile.json5（签名密码），请先加入 .gitignore 并移除"
+          fi
+
+          # 4) 复合字段名硬编码密码（JSON/properties 的 = 或 : 形式，排除全 0 占位符）
+          if git grep -n -I -E -e '"(keyPassword|storePassword|password)"[[:space:]]*[:=][[:space:]]*"?[A-Za-z0-9+/=]{16,}"?' -- . | grep -vE '"0{16,}"'; then
+            flag "当前文件含硬编码密码（= 或 : 形式）"
+          fi
+
+          # 5) Groovy/Gradle 硬编码签名密码：keyPassword 'xxx' / storePassword "xxx"
+          #    （yuema 的旧 build.gradle 就是这种写法，曾被漏报，务必保留本条）
+          if git grep -n -I -E -e "(keyPassword|storePassword)[[:space:]]+['\"][A-Za-z0-9+/=]{6,}['\"]" -- . ':(exclude).github/workflows/*'; then
+            flag "当前文件含 Groovy/Gradle 硬编码签名密码"
+          fi
+
+          # 6) 本地 keystore 绝对路径（如 d://.../*.keystore）出现在源码里
+          if git grep -n -I -E -e "[A-Za-z]:[\\\\/]([^[:space:]'\"]*[/\\\\])?(cert|keystore|sign)[^[:space:]'\"]*[/\\\\][^[:space:]'\"]*\.(keystore|jks|p12)" -- . ':(exclude).github/workflows/*'; then
+            flag "当前文件含本地 keystore 绝对路径"
+          fi
+
+          if [ "$found" -ne 0 ]; then
+            echo "预检失败：当前工作树含疑似密钥。请先脱敏再运行。"
+            echo "（清空历史无法清除当前文件里的密钥——它会成为新 root commit 的一部分。）"
+            exit 1
+          fi
+          echo "预检通过：当前工作树未发现疑似密钥。"
+
+      - name: 压平为单个 root commit
+        run: |
+          set -euo pipefail
+          echo "原 commit 数: $(git rev-list --count HEAD)"
+          git checkout --orphan reset_root
+          git add -A
+          git commit -m "初始化仓库"
+          git branch -M reset_root main
+          echo "新 commit 数: $(git rev-list --count HEAD)"
+          git log -1 --format='%H %s'
+
+      - name: 强制覆盖远端 main
+        run: |
+          set -euo pipefail
+          git push --force origin main
+          echo "::notice::历史已清空，main 现为单个 root commit「初始化仓库」。"
+          echo "::warning::请尽快到密钥签发方轮换/吊销曾泄漏的密钥；旧commit脱离ref不代表缓存/fork已消失。"
+
+      - name: 结果核对
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          echo "远端 commit 数: $(git rev-list --count origin/main)"
+          git log -1 --format='%H %s' origin/main

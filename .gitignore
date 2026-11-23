@@ -1,0 +1,83 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ---- OpenHarmony / 本地构建产物 / 备份（绝不入库）----
+/ohos/oh_modules/
+/ohos/node_modules/
+/ohos/.hvigor/
+/ohos/.engine_cache/
+/ohos/**/build/
+/ohos/local.properties
+# 鸿蒙签名配置含本地证书路径与密码，绝不入库（保留本地供构建用）
+/ohos/build-profile.json5
+/ohos/build-profile参考.json5
+/ohos/*.backup
+/ohos/**/*备份*
+/ohos/build-profile.json5
+
+*.backup
+/android/.gradle/
+/android/.idea/
+/android/local.properties
+/android/build/
+/android/**/build/
+
+# 本地改配置留下的备份文件
+*.bak_20261123
+*.bak
+
+# 本地备份、发布包（含 apk/hap/ipa 签名产物）、提示词草稿
+/_backup_*/
+/_backup_*/*/
+/发布/
+/提示词/
+
+# 签名材料兜底（本仓库密钥一律走 GitHub Secrets，不落盘）
+*.p8
+*.p12
+*.mobileprovision
+*.keystore
+*.jks
