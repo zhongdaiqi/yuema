@@ -1,0 +1,192 @@
+name: Android Release
+
+# ---------------------------------------------------------------------------
+# 目的：签名构建 Android 发布包并自动上传 Google Play 内部测试轨道。
+#
+# 签名材料全部来自仓库 Secrets（仓库里不存放任何密钥文件）：
+#   KEYSTORE_BASE64                  发布 keystore 的完整 base64
+#   KEYSTORE_PASSWORD                keystore store 密码
+#   KEY_ALIAS                        签名 alias
+#   KEY_PASSWORD                     签名 key 密码
+#   PLAY_STORE_SERVICE_ACCOUNT_JSON  Google Play 服务账号 JSON 全文
+#
+# 触发方式：
+#   - 手动（Actions → Android Release → Run workflow）
+#   - 打 v* tag（如 v2.6.8）时自动跑；注意 v* tag 同时触发 iOS 发布
+#     （ios-release.yml），一个 tag = 两端一起发；只想发安卓请手动触发。
+# 刻意不挂 push 到 main：发布构建要还原密钥、跑完整签名，日常提交走
+# android.yml 就够了。
+#
+# 版本号：不传 --build-number，versionCode 取自 pubspec 的 version（如
+# 2.6.7+9 -> 9）。Play 要求 versionCode 单调递增，**每次发版前先在
+# pubspec.yaml 把 +9 改成 +10**，否则上传会被 Play 拒绝。
+#
+# 前置条件（需在 Google Play Console 手动完成，CI 做不到）：
+#   1. 创建应用，包名 = com.zuime.yuema
+#   2. 启用 App Signing by Google Play，并用本 workflow 用的 upload key
+#      生成上传证书链（首次上传后用 Play 签发的上传密钥继续）
+#   3. 创建服务账号，授予该应用的「发布/查看」权限，JSON 全文填入 Secret
+#   4. 内部测试轨道已创建（internal），且至少完成一次合规性声明
+# ---------------------------------------------------------------------------
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: '3.41.9'
+
+jobs:
+  release-android:
+    name: 签名构建并发布 Google Play
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 安装 NDK 28.2.13676358
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
+
+      - name: 安装 Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 环境信息（排错用）
+        run: flutter --version
+
+      - name: CI 适配（Gradle / Maven 切回官方源）
+        run: |
+          python3 - <<'PY'
+          import re
+
+          p = 'android/gradle/wrapper/gradle-wrapper.properties'
+          lines = open(p, encoding='utf-8').read().splitlines()
+          for i, line in enumerate(lines):
+              if line.startswith('distributionUrl='):
+                  lines[i] = ('distributionUrl=https\\://services.gradle.org/'
+                              'distributions/gradle-8.13-bin.zip')
+          open(p, 'w', encoding='utf-8').write('\n'.join(lines) + '\n')
+          print('gradle_wrapper: switched to official distribution')
+
+          p = 'android/build.gradle'
+          s = open(p, encoding='utf-8').read()
+          s = re.sub(r"^\s*maven\s*\{\s*url\s*'https://maven\.aliyun\.com/[^']*'\s*\}\s*\n",
+                     '', s, flags=re.M)
+          open(p, 'w', encoding='utf-8').write(s)
+          print('android/build.gradle: removed aliyun maven mirrors')
+          PY
+
+      - name: 转换 pubspec（本地 path 依赖 -> pub.dev）
+        run: python3 ci/transform_pubspec_android.py
+
+      - name: 拉取依赖
+        run: flutter pub get
+
+      - name: 核对本次构建的 versionCode
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          s = open('pubspec.yaml', encoding='utf-8').read()
+          m = re.search(r'^version:\s*([0-9.]+)\+(\d+)\s*$', s, re.M)
+          if not m:
+              raise SystemExit('::error::pubspec.yaml 的 version 缺少 +buildNumber（如 2.6.7+9）')
+          print(f"versionName={m.group(1)}  versionCode={m.group(2)}")
+          print('提醒：Play 要求 versionCode 单调递增，发版前请确认已 +1')
+          PY
+
+      # ---------------------------------------------------------------------
+      # 从 Secrets 还原签名材料。先做健全性自检：缺核心 Secret 直接报错，
+      # 免得后面出现看不懂的「签名失败」。密钥只存在于 runner 临时文件，
+      # 最后一步 if: always() 删掉。
+      # ---------------------------------------------------------------------
+      - name: 还原签名密钥（Keystore + key.properties）
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::缺少签名 Secret。Android 发布流水线需要 KEYSTORE_BASE64 / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD"
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+          test -s android/app/upload-keystore.jks || { echo "::error::Keystore 解码为空，请确认 KEYSTORE_BASE64 是完整 base64"; exit 1; }
+          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=upload-keystore.jks\n' \
+            "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" > android/key.properties
+          echo "签名材料就位：android/app/upload-keystore.jks + android/key.properties"
+
+      - name: 构建签名 release AAB（Google Play 用）
+        run: flutter build appbundle --release
+
+      - name: 构建签名 release APK（split-per-abi，分渠道侧载用）
+        run: flutter build apk --release --split-per-abi
+
+      - name: 核对产物信息
+        run: |
+          set -euo pipefail
+          echo "=== 产物清单 ==="
+          find build/app/outputs \( -name '*.aab' -o -name '*.apk' \) | sort
+          echo
+          echo "=== 体积 ==="
+          find build/app/outputs \( -name '*.aab' -o -name '*.apk' \) -exec sh -c 'printf "%-8s %s\n" "$(du -h "$1" | cut -f1)" "$1"' _ {} \;
+
+      - name: 上传签名产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-signed-release
+          path: |
+            build/app/outputs/bundle/release/*.aab
+            build/app/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 检查 PLAY_STORE_SERVICE_ACCOUNT_JSON Secret
+        id: check_play_secret
+        shell: bash
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$PLAY_JSON" ]; then
+            echo "has_play_store_secret=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::未配置 PLAY_STORE_SERVICE_ACCOUNT_JSON，跳过 Play 上传（仅产出签名包）"
+          else
+            echo "has_play_store_secret=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 上传到 Google Play（内部测试轨道）
+        if: ${{ steps.check_play_secret.outputs.has_play_store_secret == 'true' }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
+          packageName: com.zuime.yuema
+          releaseFiles: build/app/outputs/bundle/release/*.aab
+          track: internal
+          status: completed
+
+      - name: 清理密钥
+        if: always()
+        run: rm -f android/app/upload-keystore.jks android/key.properties
