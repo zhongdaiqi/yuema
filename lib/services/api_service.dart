@@ -155,8 +155,14 @@ class ApiService {
       final uri = Uri.parse('$baseUrl/api/user/avator/upload');
       final request = http.MultipartRequest('POST', uri);
 
-      // 添加适当的头部
+      // 添加适当的头部（上传接口需要登录态，必须带访问令牌）
       request.headers['Accept'] = 'application/json';
+      final sessionForUpload = await SessionService.getInstance();
+      if (sessionForUpload.authToken != null &&
+          sessionForUpload.authToken!.isNotEmpty) {
+        request.headers['Authorization'] =
+            'Bearer ${sessionForUpload.authToken}';
+      }
 
       // 确保文件名有合适的扩展名，并使用标准英文名
       String finalFileName = fileName;
