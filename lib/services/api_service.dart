@@ -1806,4 +1806,115 @@ class ApiService {
       rethrow;
     }
   }
+
+  /// 注销当前账号（App Store 5.1.1(v) 自助注销）
+  static Future<Map<String, dynamic>> deleteAccount() async {
+    try {
+      final session = await SessionService.getInstance();
+      if (!session.isLoggedIn) {
+        return {'success': false, 'message': '用户未登录'};
+      }
+
+      final url = Uri.parse('$baseUrl/api/user/delete-account');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${session.authToken}',
+        },
+        body: jsonEncode({'appId': 'com.zuime.yuema'}),
+      );
+
+      _checkResponseStatus(response);
+      final responseBody = _decodeUtf8ResponseBody(response);
+      return jsonDecode(responseBody);
+    } catch (e) {
+      print('Error deleting account: $e');
+      return {'success': false, 'message': '网络请求失败'};
+    }
+  }
+
+  /// 举报违规内容
+  static Future<Map<String, dynamic>> reportContent({
+    required int noteId,
+    required String reportType,
+    String reason = '',
+  }) async {
+    try {
+      final session = await SessionService.getInstance();
+      if (!session.isLoggedIn) {
+        return {'success': false, 'message': '用户未登录'};
+      }
+      final url = Uri.parse('$baseUrl/api/user/report');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${session.authToken}',
+        },
+        body: jsonEncode({
+          'appId': 'com.zuime.yuema',
+          'noteId': noteId,
+          'reportType': reportType,
+          'reason': reason,
+        }),
+      );
+      _checkResponseStatus(response);
+      return jsonDecode(_decodeUtf8ResponseBody(response));
+    } catch (e) {
+      print('Error reporting content: $e');
+      return {'success': false, 'message': '网络请求失败'};
+    }
+  }
+
+  /// 屏蔽用户
+  static Future<Map<String, dynamic>> blockUser(int blockedUserId) async {
+    try {
+      final session = await SessionService.getInstance();
+      if (!session.isLoggedIn) {
+        return {'success': false, 'message': '用户未登录'};
+      }
+      final url = Uri.parse('$baseUrl/api/user/block');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${session.authToken}',
+        },
+        body: jsonEncode({
+          'appId': 'com.zuime.yuema',
+          'blockedUserId': blockedUserId,
+        }),
+      );
+      _checkResponseStatus(response);
+      return jsonDecode(_decodeUtf8ResponseBody(response));
+    } catch (e) {
+      print('Error blocking user: $e');
+      return {'success': false, 'message': '网络请求失败'};
+    }
+  }
+
+  /// 取消屏蔽用户
+  static Future<Map<String, dynamic>> unblockUser(int blockedUserId) async {
+    try {
+      final session = await SessionService.getInstance();
+      if (!session.isLoggedIn) {
+        return {'success': false, 'message': '用户未登录'};
+      }
+      final url = Uri.parse('$baseUrl/api/user/unblock');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${session.authToken}',
+        },
+        body: jsonEncode({'blockedUserId': blockedUserId}),
+      );
+      _checkResponseStatus(response);
+      return jsonDecode(_decodeUtf8ResponseBody(response));
+    } catch (e) {
+      print('Error unblocking user: $e');
+      return {'success': false, 'message': '网络请求失败'};
+    }
+  }
 }

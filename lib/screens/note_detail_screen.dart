@@ -362,8 +362,41 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                     ),
                   ),
 
-                  // 关注按钮放在最右侧
+                  // 举报/屏蔽 + 关注按钮放在最右侧
                   const Spacer(),
+                  if (_noteDetail != null)
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert),
+                      onSelected: (value) {
+                        if (value == 'report') {
+                          _showReportDialog();
+                        } else if (value == 'block') {
+                          _showBlockDialog();
+                        }
+                      },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem<String>(
+                          value: 'report',
+                          child: Row(
+                            children: [
+                              Icon(Icons.report_outlined, size: 18),
+                              SizedBox(width: 8),
+                              Text('举报内容'),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem<String>(
+                          value: 'block',
+                          child: Row(
+                            children: [
+                              Icon(Icons.block, size: 18),
+                              SizedBox(width: 8),
+                              Text('屏蔽用户'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   if (_noteDetail != null)
                     ElevatedButton(
                       onPressed:
@@ -689,6 +722,106 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
         SnackBar(content: Text('取消关注失败: $e')),
       );
     }
+  }
+
+  // 举报内容（App Store 1.2 合规）
+  void _showReportDialog() {
+    if (_noteDetail == null) return;
+    final reasonController = TextEditingController();
+    String selectedType = '色情低俗';
+    const types = ['色情低俗', '虚假诈骗', '侵权抄袭', '人身攻击', '违法违规', '其他'];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('举报内容'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('请选择举报原因：'),
+                ...types.map((t) => RadioListTile<String>(
+                      title: Text(t),
+                      value: t,
+                      groupValue: selectedType,
+                      dense: true,
+                      onChanged: (v) {
+                        setDialogState(() => selectedType = v ?? t);
+                      },
+                    )),
+                TextField(
+                  controller: reasonController,
+                  decoration: const InputDecoration(
+                    labelText: '补充说明（可选）',
+                    hintText: '请描述具体问题',
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final navigator = Navigator.of(ctx);
+                final messenger = ScaffoldMessenger.of(context);
+                navigator.pop();
+                final result = await ApiService.reportContent(
+                  noteId: _noteDetail!.noteId,
+                  reportType: selectedType,
+                  reason: reasonController.text.trim(),
+                );
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(result['success'] == true
+                        ? '举报已提交，我们会尽快处理'
+                        : (result['message'] ?? '举报失败')),
+                  ),
+                );
+              },
+              child: const Text('提交'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 屏蔽该内容作者
+  void _showBlockDialog() {
+    if (_noteDetail == null || _noteDetail!.userId == null) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('屏蔽用户'),
+        content: const Text('屏蔽后你将不再看到该用户发布的内容。确定屏蔽吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.pop(ctx);
+              final result = await ApiService.blockUser(_noteDetail!.userId!);
+              messenger.showSnackBar(
+                SnackBar(content: Text(result['success'] == true
+                    ? '已屏蔽该用户'
+                    : (result['message'] ?? '屏蔽失败'))),
+              );
+            },
+            child: const Text('确定', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   // 点赞笔记

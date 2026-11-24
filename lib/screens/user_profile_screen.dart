@@ -366,18 +366,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
           const SizedBox(height: 16.0),
 
-          // 操作按钮
-          Center(
-            child: ElevatedButton(
-              onPressed: () {
-                // 关注/取消关注逻辑
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('关注功能正在开发中')),
-                );
-              },
-              child: Text(_userProfile!.isFollowed ? '已关注' : '关注'),
+          // 关注状态展示（关注操作请在笔记详情页进行）
+          if (_userProfile!.isFollowed)
+            const Center(
+              child: Chip(
+                avatar: Icon(Icons.check_circle, size: 16, color: Colors.green),
+                label: Text('已关注'),
+              ),
             ),
-          ),
         ],
       ),
     );

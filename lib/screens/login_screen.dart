@@ -330,26 +330,29 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 16),
 
-              // 华为登录按钮
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _huaweiLogin,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[800], // 华为品牌颜色
-                    foregroundColor: Colors.white,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.phone_android, size: 20),
-                      const SizedBox(width: 8),
-                      const Text('华为账号登录'),
-                    ],
+              // 华为登录按钮（仅 Android/鸿蒙显示；iOS 提供 Sign in with Apple）
+              if (!AppleLoginService.isSupported) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _huaweiLogin,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[800], // 华为品牌颜色
+                      foregroundColor: Colors.white,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.phone_android, size: 20),
+                        const SizedBox(width: 8),
+                        const Text('华为账号登录'),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              ],
 
               // Apple 登录按钮（仅 iOS 显示原生 Sign in with Apple）
               if (AppleLoginService.isSupported) ...[

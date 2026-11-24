@@ -314,11 +314,11 @@ class _MainScreenState extends State<MainScreen> {
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
               const PopupMenuItem<String>(
                 value: 'privacy',
-                child: Text('用户协议'),
+                child: Text('隐私政策'),
               ),
               const PopupMenuItem<String>(
                 value: 'service',
-                child: Text('隐私协议'),
+                child: Text('用户协议'),
               ),
               const PopupMenuDivider(),
               const PopupMenuItem<String>(
