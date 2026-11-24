@@ -279,24 +279,26 @@ class _PersonalNoteDetailScreenState extends State<PersonalNoteDetailScreen> {
     ApiService.setGlobalContext(context);
 
     return Scaffold(
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage.isNotEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(_errorMessage),
-                      ElevatedButton(
-                        onPressed: _loadNoteDetail,
-                        child: const Text('重新加载'),
-                      ),
-                    ],
-                  ),
-                )
-              : _noteDetail == null
-                  ? const Center(child: Text('未找到笔记详情'))
-                  : _buildNoteDetailContent(),
+      body: SafeArea(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _errorMessage.isNotEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(_errorMessage),
+                        ElevatedButton(
+                          onPressed: _loadNoteDetail,
+                          child: const Text('重新加载'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _noteDetail == null
+                    ? const Center(child: Text('未找到笔记详情'))
+                    : _buildNoteDetailContent(),
+      ),
     );
   }
 
