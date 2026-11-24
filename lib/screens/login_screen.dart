@@ -8,6 +8,7 @@ import '../services/session_service.dart';
 import '../services/cloud_log_service.dart'; // 添加云日志服务导入
 import '../services/device_id_service.dart'; // 添加设备ID服务导入
 import 'huawei_login_page.dart'; // 更新导入路径
+import '../services/apple_login_service.dart'; // Apple 登录（仅 iOS）
 import 'register_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'service_agreement_screen.dart';
@@ -35,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     _loadSavedCredentials();
     _loadDeviceId(); // 加载设备ID
-    
+
     // 记录页面访问日志
     final cloudLog = CloudLogService();
     cloudLog.logPageView('login_screen');
@@ -178,6 +179,11 @@ class _LoginScreenState extends State<LoginScreen> {
         builder: (context) => const HuaweiLoginPage(),
       ),
     );
+  }
+
+  // Apple 登录（仅 iOS 原生 Sign in with Apple；其他平台不显示按钮）
+  void _appleLogin() {
+    AppleLoginService.signIn(context);
   }
 
   @override
@@ -344,6 +350,30 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
+
+              // Apple 登录按钮（仅 iOS 显示原生 Sign in with Apple）
+              if (AppleLoginService.isSupported) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _appleLogin,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.apple, size: 20),
+                        const SizedBox(width: 8),
+                        const Text('Apple 账号登录'),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
