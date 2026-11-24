@@ -8,7 +8,6 @@ import 'note_detail_screen.dart';
 import 'personal_note_detail_screen.dart'; // 导入个人笔记详情页面
 import 'login_screen.dart'; // 导入登录页面
 import 'avatar_edit_screen.dart'; // 导入头像编辑页面
-import 'longzhu_screen.dart'; // 导入龙珠界面
 
 // 个人主页信息模型
 class PersonalProfile {
@@ -506,7 +505,7 @@ class _PersonalProfileScreenState extends State<PersonalProfileScreen>
 
           // 操作按钮
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               ElevatedButton(
                 onPressed: () {
@@ -527,22 +526,6 @@ class _PersonalProfileScreenState extends State<PersonalProfileScreen>
                   });
                 },
                 child: const Text('修改头像'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  // 领取龙珠功能 - 进入龙珠界面
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LongZhuScreen(),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('领取龙珠'),
               ),
             ],
           ),
