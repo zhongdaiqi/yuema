@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/activity_join.dart';
 import '../services/api_service.dart';
+import '../services/thumb_url_util.dart';
 
 class ActivityAuditScreen extends StatefulWidget {
   final int noteId;
@@ -257,7 +258,7 @@ class _ActivityAuditScreenState extends State<ActivityAuditScreen> {
                                       CircleAvatar(
                                         radius: 20,
                                         backgroundImage: join.avatar.isNotEmpty
-                                            ? NetworkImage(join.avatar)
+                                            ? NetworkImage(ThumbUrlUtil.avatar100(join.avatar))
                                             : null,
                                         child: join.avatar.isEmpty
                                             ? const Icon(Icons.person, size: 20)

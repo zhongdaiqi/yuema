@@ -324,7 +324,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           // 用户头像
           CircleAvatar(
             radius: 50.0,
-            backgroundImage: NetworkImage(_userProfile!.avatar),
+            backgroundImage: NetworkImage(ThumbUrlUtil.avatar100(_userProfile!.avatar)),
             onBackgroundImageError: (exception, stackTrace) {
               // 处理头像加载失败
             },
@@ -490,7 +490,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                                   CircleAvatar(
                                     radius: 10.0,
                                     backgroundImage:
-                                        NetworkImage(notes[i].avatarUrl),
+                                        NetworkImage(ThumbUrlUtil.avatar100(notes[i].avatarUrl)),
                                     onBackgroundImageError:
                                         (exception, stackTrace) {
                                       // 处理头像加载失败

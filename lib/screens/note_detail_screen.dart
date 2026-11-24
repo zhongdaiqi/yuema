@@ -323,7 +323,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                       radius: 20.0,
                       backgroundImage: _noteDetail != null &&
                               _noteDetail!.avatarUrl.isNotEmpty
-                          ? NetworkImage(_noteDetail!.avatarUrl)
+                          ? NetworkImage(ThumbUrlUtil.avatar100(_noteDetail!.avatarUrl))
                           : null,
                       backgroundColor: Colors.grey[200],
                       child:

@@ -167,7 +167,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
     if (isValidUrl) {
       return CircleAvatar(
         radius: 10.0,
-        backgroundImage: NetworkImage(avatarUrl),
+        backgroundImage: NetworkImage(ThumbUrlUtil.avatar100(avatarUrl)),
         onBackgroundImageError: (exception, stackTrace) {
           // 图片加载失败时的处理（静默失败，不抛出异常）
         },

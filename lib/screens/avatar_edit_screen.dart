@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
+import '../services/thumb_url_util.dart';
 
 class AvatarEditScreen extends StatefulWidget {
   final String currentAvatarUrl;
@@ -72,7 +73,7 @@ class _AvatarEditScreenState extends State<AvatarEditScreen> {
                       const SizedBox(height: 16),
                       CircleAvatar(
                         radius: 80,
-                        backgroundImage: NetworkImage(widget.currentAvatarUrl),
+                        backgroundImage: NetworkImage(ThumbUrlUtil.avatar100(widget.currentAvatarUrl)),
                         onBackgroundImageError: (exception, stackTrace) {
                           // 处理头像加载失败
                         },

@@ -438,7 +438,7 @@ class _PersonalProfileScreenState extends State<PersonalProfileScreen>
             child: CircleAvatar(
               radius: 50.0,
               backgroundImage: _personalProfile!.avatar.isNotEmpty
-                  ? NetworkImage(_personalProfile!.avatar)
+                  ? NetworkImage(ThumbUrlUtil.avatar100(_personalProfile!.avatar))
                   : null,
               backgroundColor: Colors.grey[200],
               child: _personalProfile!.avatar.isEmpty
@@ -648,7 +648,7 @@ class _PersonalProfileScreenState extends State<PersonalProfileScreen>
                             CircleAvatar(
                               radius: 10.0,
                               backgroundImage: note.avatarUrl.isNotEmpty
-                                  ? NetworkImage(note.avatarUrl)
+                                  ? NetworkImage(ThumbUrlUtil.avatar100(note.avatarUrl))
                                   : null,
                               backgroundColor: Colors.grey[200],
                               child: note.avatarUrl.isEmpty

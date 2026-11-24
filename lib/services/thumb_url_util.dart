@@ -48,4 +48,37 @@ class ThumbUrlUtil {
 
   /// 判断是否为缩略图 URL
   static bool isThumb(String url) => url.contains('/thumb/w');
+
+  /// 头像缩略图目录段（与后端 ImageThumbUtil.AVATAR_THUMB_DIR = s100 一致）
+  static const String avatarThumbSeg = '/thumb/s100/';
+
+  /// 头像原图 URL -> 100x100 正方形缩略图 URL。
+  /// 后端上传头像时同步生成 thumb/s100/ 静态文件（居中裁剪，不拉伸）。
+  /// - 空串 / 非 http(s) 外链 / 已是缩略图：原样返回（幂等）
+  /// - 仅处理 /avatar/ 下的本服务图片，避免拼坏第三方 URL
+  static String avatar100(String url) {
+    if (url.isEmpty) return url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) return url;
+    if (url.contains(avatarThumbSeg)) return url; // 幂等
+
+    final q = url.indexOf('?');
+    final base = q >= 0 ? url.substring(0, q) : url;
+    final query = q >= 0 ? url.substring(q) : '';
+    final marker = '/avatar/';
+    final markerPos = base.indexOf(marker);
+    if (markerPos < 0) return url;
+
+    final afterMarker = base.substring(markerPos + marker.length);
+    final slash = afterMarker.lastIndexOf('/');
+    if (slash <= 0) return url; // 需要 /avatar/<目录>/<文件>
+    final file = afterMarker.substring(slash + 1);
+    if (file.isEmpty) return url;
+
+    return '${base.substring(0, markerPos + marker.length)}'
+        '${afterMarker.substring(0, slash + 1)}'
+        'thumb/s100/$file$query';
+  }
+
+  /// 判断是否为头像 100x100 缩略图 URL
+  static bool isAvatarThumb(String url) => url.contains(avatarThumbSeg);
 }
