@@ -348,30 +348,34 @@ class _PersonalNoteDetailScreenState extends State<PersonalNoteDetailScreen> {
                   ),
                   const SizedBox(width: 8.0),
 
-                  // 用户昵称
-                  GestureDetector(
-                    onTap: () {
-                      // 点击昵称进入个人主页
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const PersonalProfileScreen(),
+                  // 用户昵称（长昵称省略，避免挤掉右侧关注/编辑按钮）
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        // 点击昵称进入个人主页
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const PersonalProfileScreen(),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        _noteDetail!.nickName.isNotEmpty
+                            ? _noteDetail!.nickName
+                            : '未知用户',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16.0,
                         ),
-                      );
-                    },
-                    child: Text(
-                      _noteDetail!.nickName.isNotEmpty
-                          ? _noteDetail!.nickName
-                          : '未知用户',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16.0,
                       ),
                     ),
                   ),
+                  const SizedBox(width: 8.0),
 
                   // 关注按钮放在最右侧
-                  const Spacer(),
                   ElevatedButton(
                     onPressed:
                         _noteDetail!.isFollowed ? _unfollowUser : _followUser,

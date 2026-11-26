@@ -337,33 +337,37 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                   ),
                   const SizedBox(width: 8.0),
 
-                  // 用户昵称
-                  GestureDetector(
-                    onTap: () {
-                      // 点击昵称进入用户主页
-                      if (_noteDetail != null && _noteDetail!.userId != null) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                UserProfileScreen(userId: _noteDetail!.userId!),
-                          ),
-                        );
-                      }
-                    },
-                    child: Text(
-                      _noteDetail != null && _noteDetail!.nickName.isNotEmpty
-                          ? _noteDetail!.nickName
-                          : '未知用户',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16.0,
+                  // 用户昵称（长昵称省略，避免挤掉右侧关注/举报按钮）
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        // 点击昵称进入用户主页
+                        if (_noteDetail != null && _noteDetail!.userId != null) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => UserProfileScreen(
+                                  userId: _noteDetail!.userId!),
+                            ),
+                          );
+                        }
+                      },
+                      child: Text(
+                        _noteDetail != null && _noteDetail!.nickName.isNotEmpty
+                            ? _noteDetail!.nickName
+                            : '未知用户',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16.0,
+                        ),
                       ),
                     ),
                   ),
+                  const SizedBox(width: 8.0),
 
-                  // 举报/屏蔽 + 关注按钮放在最右侧
-                  const Spacer(),
+                  // 举报/屏蔽 + 关注按钮固定在最右侧
                   if (_noteDetail != null)
                     PopupMenuButton<String>(
                       icon: const Icon(Icons.more_vert),
