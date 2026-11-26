@@ -1,0 +1,191 @@
+name: iOS iPad 13 英寸商店截图
+
+# ---------------------------------------------------------------------------
+# 目的：在没有 Mac 的前提下，用 GitHub macOS runner 启动 iPad Pro 13 英寸
+#       模拟器，注入演示账号登录态，截取 App 真实首页，产出 App Store Connect
+#       要求的 13 英寸 iPad 截屏（2064×2752 或 2048×2732 竖屏 PNG）。
+#
+# 为什么需要这个 workflow：
+#   App 的 iOS 工程 TARGETED_DEVICE_FAMILY = "1,2"（iPhone + iPad），
+#   App Store Connect 会强制要求上传「13 英寸 iPad 显示屏」截图，否则无法提交。
+#
+# 前置条件（需你在仓库 Settings → Secrets and variables → Actions 配置）：
+#   DEMO_USERNAME  App 演示账号（必须已审核通过、账号内有笔记/活动数据）
+#   DEMO_PASSWORD  该账号密码
+#   ⚠️ 审核演示账号文档里目前是占位符，必须先填真实账号才能跑出有内容的截图。
+#
+# 触发：手动 workflow_dispatch（不挂 push / tag，避免无谓消耗 macOS runner 计费）。
+#
+# 产物：Run 页面 Artifacts → ipad13-screenshots，下载后上传 App Store Connect。
+# ---------------------------------------------------------------------------
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-screenshots
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: '3.41.9'
+
+jobs:
+  screenshots:
+    name: 生成 13 英寸 iPad 截图
+    runs-on: macos-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 环境信息
+        run: |
+          flutter --version
+          xcodebuild -version
+
+      # 与 ios.yml 同款转换：本地 F:/flutter_ohos 路径在 runner 上不存在。
+      - name: 转换 pubspec（本地 path 依赖 -> pub.dev / 桩）
+        env:
+          DEVELOPMENT_TEAM_CI: 'CI00000000'
+        run: python3 ci/transform_pubspec_ios.py
+
+      # 截图必须用生产 API 才能拉到真实内容；debug/profile 构建默认走 localhost，
+      # 这里仅在此次 CI checkout 里把 dev baseUrl 改成生产地址（不入库）。
+      - name: 切到生产 API（仅 CI 临时 checkout）
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          p = 'lib/services/api_service.dart'
+          s = open(p, encoding='utf-8').read()
+          old = "static const String _devBaseUrl = 'http://localhost';"
+          new = "static const String _devBaseUrl = 'https://yuema.zuime.com';"
+          if old not in s:
+              raise SystemExit('::error::api_service.dart 未找到 dev baseUrl 锚点，请人工核对')
+          open(p, 'w', encoding='utf-8').write(s.replace(old, new, 1))
+          print('dev baseUrl -> https://yuema.zuime.com')
+          PY
+
+      - name: 拉取依赖
+        run: flutter pub get
+
+      # --simulator 构建是 debug/profile，baseUrl 已在上一步改生产；
+      # debugShowCheckedModeBanner=false 已保证无 DEBUG 角标。
+      - name: 构建 iOS 模拟器版
+        run: |
+          set -euo pipefail
+          flutter build ios --simulator --no-codesign
+          APP="build/ios/simulator/Debug-iphonesimulator/Runner.app"
+          test -d "$APP" || { echo "::error::未找到 $APP"; find build/ios/simulator -maxdepth 4 -type d; exit 1; }
+          echo "APP=$APP" >> "$GITHUB_ENV"
+
+      - name: 启动 iPad Pro 13 英寸模拟器
+        run: |
+          set -euo pipefail
+          # 优先 13 英寸（2064×2752）；没有则退回 12.9 英寸（2048×2732，同样被接受）
+          DEV=$(xcrun simctl list devices available | grep -E 'iPad Pro 13-inch \(M[45]\)' | head -1 | sed -E 's/.*\(([A-F0-9-]{36})\).*/\1/' || true)
+          if [ -z "$DEV" ]; then
+            DEV=$(xcrun simctl list devices available | grep -E 'iPad Pro 12\.9-inch \(6th generation\)' | head -1 | sed -E 's/.*\(([A-F0-9-]{36})\).*/\1/' || true)
+          fi
+          if [ -z "$DEV" ]; then
+            echo "::error::runner 上找不到 iPad Pro 13 英寸或 12.9 英寸模拟器"
+            xcrun simctl list devices available | grep -i ipad || true
+            exit 1
+          fi
+          echo "SIM_UDID=$DEV" >> "$GITHUB_ENV"
+          xcrun simctl boot "$DEV" || true
+          xcrun simctl bootstatus "$DEV" -b
+          echo "已启动模拟器 $DEV"
+
+      # 用 curl 走真实登录接口换 token（不打印任何凭据/token）。
+      - name: 演示账号登录获取 token
+        env:
+          DEMO_USERNAME: ${{ secrets.DEMO_USERNAME }}
+          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEMO_USERNAME:-}" ] || [ -z "${DEMO_PASSWORD:-}" ]; then
+            echo "::error::未配置 Secrets DEMO_USERNAME / DEMO_PASSWORD，无法生成有内容的截图"
+            exit 1
+          fi
+          python3 - <<'PY' > "$RUNNER_TEMP/login_body.json"
+          import json, os
+          print(json.dumps({
+              "username": os.environ["DEMO_USERNAME"],
+              "password": os.environ["DEMO_PASSWORD"],
+              "appId": "com.zuime.yuema",
+          }, ensure_ascii=False))
+          PY
+          curl -sS -X POST 'https://yuema.zuime.com/api/user/login' \
+            -H 'Content-Type: application/json' \
+            --data-binary @"$RUNNER_TEMP/login_body.json" \
+            -o "$RUNNER_TEMP/login_resp.json"
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json, os
+          raw = open(os.environ["RUNNER_TEMP"] + "/login_resp.json", "rb").read().decode("utf-8", "replace")
+          d = json.loads(raw)
+          data = d.get("data") or {}
+          token = data.get("token") or ""
+          uid = str(data.get("id") or "")
+          if not d.get("success") or not token:
+              raise SystemExit("::error::演示账号登录失败，请检查 Secrets 与账号审核状态: %s" % d.get("message"))
+          print("DEMO_TOKEN=" + token)
+          print("DEMO_UID=" + uid)
+          PY
+
+      # Flutter shared_preferences 在 iOS 上落到 NSUserDefaults，domain = bundle id。
+      # 必须在 App 首次启动前写入，跳过协议弹窗并注入登录态。
+      - name: 注入协议同意与登录态
+        run: |
+          set -euo pipefail
+          BID="com.zuime.yuema"
+          xcrun simctl spawn "$SIM_UDID" defaults write "$BID" agreed_to_agreements -bool true
+          xcrun simctl spawn "$SIM_UDID" defaults write "$BID" auth_token -string "$DEMO_TOKEN"
+          xcrun simctl spawn "$SIM_UDID" defaults write "$BID" user_id -string "$DEMO_UID"
+          xcrun simctl spawn "$SIM_UDID" defaults write "$BID" username -string "screenshot_demo"
+          xcrun simctl spawn "$SIM_UDID" killall cfprefsd 2>/dev/null || true
+          echo "登录态已注入（不回显 token）"
+
+      - name: 安装并启动 App
+        run: |
+          set -euo pipefail
+          xcrun simctl install "$SIM_UDID" "$APP"
+          xcrun simctl launch "$SIM_UDID" com.zuime.yuema
+          # 等待 Splash → 主界面 → 瀑布流接口返回并渲染
+          sleep 12
+
+      - name: 截图并校验尺寸
+        run: |
+          set -euo pipefail
+          mkdir -p screenshots/ipad13
+          xcrun simctl io "$SIM_UDID" screenshot --type=png screenshots/ipad13/01-home.png
+          sips -g pixelWidth -g pixelHeight screenshots/ipad13/01-home.png
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          p = Path('screenshots/ipad13/01-home.png')
+          data = p.read_bytes()
+          assert data[:8] == b'\x89PNG\r\n\x1a\n', '不是 PNG'
+          w, h = struct.unpack('>II', data[16:24])
+          print('截图尺寸: %dx%d' % (w, h))
+          if (w, h) not in [(2064, 2752), (2752, 2064), (2048, 2732), (2732, 2048)]:
+              raise SystemExit('::error::尺寸不符合 13 英寸 iPad 要求（2064×2752 / 2048×2732）')
+          print('尺寸校验通过')
+          PY
+
+      - name: 上传截图 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipad13-screenshots
+          path: screenshots/ipad13
+          if-no-files-found: error
