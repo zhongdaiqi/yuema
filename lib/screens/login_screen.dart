@@ -9,6 +9,7 @@ import '../services/cloud_log_service.dart'; // 添加云日志服务导入
 import '../services/device_id_service.dart'; // 添加设备ID服务导入
 import 'huawei_login_page.dart'; // 更新导入路径
 import '../services/apple_login_service.dart'; // Apple 登录（仅 iOS）
+import '../services/wechat_login_service.dart'; // 微信登录（全平台）
 import 'register_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'service_agreement_screen.dart';
@@ -29,6 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _agreedToPolicy = false;
   bool _rememberMe = false; // 添加记住账号密码选项
   bool _isLoading = false;
+  bool _wechatLoading = false; // 微信授权中（与账号密码登录独立，避免互相卡住）
   String _deviceId = ''; // 存储设备ID
 
   @override
@@ -36,6 +38,8 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     _loadSavedCredentials();
     _loadDeviceId(); // 加载设备ID
+    // 预初始化微信 SDK：首次点微信登录无需等待，体验更顺
+    WechatLoginService.init().catchError((_) {});
 
     // 记录页面访问日志
     final cloudLog = CloudLogService();
@@ -186,6 +190,33 @@ class _LoginScreenState extends State<LoginScreen> {
     AppleLoginService.signIn(context);
   }
 
+  // 微信登录：跳转微信授权 → 回调拿 code → 后端换 token → 写会话 → 跳主页
+  void _wechatLogin() {
+    if (_wechatLoading) return;
+    setState(() => _wechatLoading = true);
+    WechatLoginService.signIn(
+      onResult: (result) {
+        if (!mounted) return;
+        setState(() => _wechatLoading = false);
+
+        // 用户取消授权：静默返回，不打扰
+        if (result.cancelled) return;
+
+        if (result.success) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+            (route) => false,
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result.message ?? '微信登录失败')),
+          );
+        }
+      },
+    );
+  }
+
   @override
   void dispose() {
     _usernameController.dispose();
@@ -325,6 +356,38 @@ class _LoginScreenState extends State<LoginScreen> {
                     );
                   },
                   child: const Text('没有账号？立即注册'),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 微信登录按钮（全平台；未安装微信时由服务给出明确提示）
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: (_isLoading || _wechatLoading) ? null : _wechatLogin,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF07C160), // 微信品牌绿
+                    foregroundColor: Colors.white,
+                  ),
+                  child: _wechatLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.chat_bubble, size: 20),
+                            SizedBox(width: 8),
+                            Text('微信登录'),
+                          ],
+                        ),
                 ),
               ),
 

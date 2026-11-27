@@ -70,6 +70,11 @@ jobs:
       - name: 拉取依赖
         run: flutter pub get
 
+      # fluwx 的 podspec preamble 在 CI 的 Pods 结构下会 abort（无法反推工程根目录），
+      # 微信配置已静态提交，这里只替换 preamble。必须在 pub get 之后执行。
+      - name: 修正 fluwx podspec（去掉依赖 Xcode 工程上下文的 preamble）
+        run: python3 ci/patch_fluwx_podspec.py
+
       # ---------------------------------------------------------------------
       # App Store Connect API Key 落到 xcodebuild 认的目录，并做格式自检。
       # 手工粘贴 .p8 最常见错误是漏 BEGIN/END 两行，这里提前给人话报错。

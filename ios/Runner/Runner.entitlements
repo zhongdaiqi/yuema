@@ -6,5 +6,13 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<!-- 微信登录回跳：与微信开放平台「Universal Links」、服务端 AASA 的 paths(/app/*) 三者同域。
+	     域名 yuema.zuime.com；改动此处等于改 Universal Link，微信开放平台需重新审核。
+	     ⚠️ 前提：Apple Developer → Identifiers → com.zuime.yuema 已勾选 Associated Domains，
+	     否则 CI 自动签名拿到的 profile 不含该能力，构建会因 entitlement 不匹配失败。 -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:yuema.zuime.com</string>
+	</array>
 </dict>
 </plist>

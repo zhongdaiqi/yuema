@@ -17,6 +17,19 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
 version: 2.6.7+9
+# fluwx（微信）iOS 端配置（与 dingzhixia 同款）：
+#   app_id         -> 微信开放平台 AppID（也是 URL Scheme wx<appId> 的来源）
+#   ios.universal_link -> 微信回跳 Universal Link；三处严格一致：
+#     微信开放平台后台、服务端 AASA paths(/app/*)、Runner.entitlements 的 applinks
+# ignore_security: true 防止 wechat_setup.rb 全局关掉 ATS。
+# 注：CI 已静态提交 iOS 配置，patch_fluwx_podspec.py 不再调用 wechat_setup.rb，
+#     本段作为「单一真相」供人核对（见 发布/微信登录接入说明.md）。
+fluwx:
+  app_id: wxff760c510b1c8b20
+  ios:
+    universal_link: https://yuema.zuime.com/app/
+    ignore_security: true
+
 
 # 2026-11-23: 参照 dingzhixia 升级到 Flutter 3.41.9+ohos-1.0.2 / Dart 3.11.5。
 # Dart 3.11 要求放宽 sdk 约束；原 ^3.6.2 对新 SDK 过严。
@@ -52,6 +65,9 @@ dependencies:
   path_provider:
   fluttertoast:
   device_info_plus:
+  # 微信登录：锁 5.x（6.x 要求 Dart 3.11 且 podspec preamble 结构不同，
+  # 与 ci/patch_fluwx_podspec.py 针对的 5.7.x 不匹配）。hosted 包 CI 可解析。
+  fluwx: ^5.7.5
   flutter_staggered_grid_view: ^0.7.0
   carousel_slider: ^5.0.0
   web_socket_channel: ^3.0.3

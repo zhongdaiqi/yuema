@@ -13,6 +13,10 @@ class ApiService {
   static const String _devBaseUrl = 'http://localhost';
   static const String _prodBaseUrl = 'https://yuema.zuime.com';
 
+  // 微信开放平台配置（iOS 回跳三处必须一致，见 wechat_login_service.dart 注释）
+  static const String wechatAppId = 'wxff760c510b1c8b20';
+  static const String wechatUniversalLink = 'https://yuema.zuime.com/app/';
+
   // 根据运行环境确定baseUrl
   static String get baseUrl {
     if (kReleaseMode) {
@@ -143,6 +147,37 @@ class ApiService {
     }
 
     return result;
+  }
+
+  /// 微信授权登录：用微信授权 code 换取后端会话
+  /// POST /api/user/wxlogin  body={appId, code}
+  /// 返回 {success, message, data:{id, nickname, avatar, token, expire_time}}
+  /// 注意：会话写入由 WechatLoginService 统一处理，这里只做请求与解码，
+  /// 避免 Sso 写入逻辑分散两处（与 loginUser 的写法不同是有意为之）。
+  static Future<Map<String, dynamic>> wechatLogin({
+    required String appId,
+    required String code,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/user/wxlogin');
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'appId': appId, 'code': code}),
+      );
+      final responseBody = _decodeUtf8ResponseBody(response);
+      final decoded = jsonDecode(responseBody);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return {
+        'success': false,
+        'message': '微信登录响应格式异常',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': '网络请求失败，请检查网络后重试',
+      };
+    }
   }
 
   // 上传头像

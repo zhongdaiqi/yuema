@@ -60,6 +60,13 @@ jobs:
       - name: 拉取依赖
         run: flutter pub get
 
+      # fluwx 的 podspec 顶部用 '/.symlinks' 反推工程根目录再调 wechat_setup.rb
+      # 改写 xcodeproj/Info.plist/entitlements；CI 的 Pods 结构下推不出来会 abort。
+      # 微信 iOS 配置已静态提交（Info.plist URL scheme + entitlements applinks），
+      # 这里只把那段 preamble 换成固定变量声明。必须在 pub get 之后执行。
+      - name: 修正 fluwx podspec（去掉依赖 Xcode 工程上下文的 preamble）
+        run: python3 ci/patch_fluwx_podspec.py
+
       - name: 构建 iOS（未签名）
         # --build-number 取 run number，避免重复构建号；
         # --no-codesign 只生成 Pods 与配置，不签名（签名在 ios-release.yml 做）

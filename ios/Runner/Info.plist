@@ -51,5 +51,28 @@
 	<string>约吗需要访问你的相册，以便你更换头像、选择图片发布笔记和活动。</string>
 	<key>NSCameraUsageDescription</key>
 	<string>约吗需要使用相机，以便你拍照后更换头像或发布笔记、活动图片。</string>
+	<!-- 微信 SDK 回跳 scheme = 微信开放平台 AppID。微信授权结束用 wx<AppID>:// 唤起本 App。
+	     与 lib/services/api_service.dart 的 wechatAppId 保持一致。 -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>weixin</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>wxff760c510b1c8b20</string>
+			</array>
+		</dict>
+	</array>
+	<!-- 微信 SDK 用 canOpenURL 探测微信是否安装，iOS 9+ 必须列白名单，
+	     否则 isWeChatInstalled() 恒 false（fluwx 官方 wechat_setup.rb 默认清单）。 -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>weixin</string>
+		<string>weixinULAPI</string>
+		<string>weixinURLParamsAPI</string>
+	</array>
 </dict>
 </plist>

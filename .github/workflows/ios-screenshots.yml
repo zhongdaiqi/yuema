@@ -79,14 +79,20 @@ jobs:
       - name: 拉取依赖
         run: flutter pub get
 
+      # fluwx podspec preamble 在 CI Pods 结构下会 abort，须在 build 前打补丁
+      - name: 修正 fluwx podspec
+        run: python3 ci/patch_fluwx_podspec.py
+
       # --simulator 构建是 debug/profile，baseUrl 已在上一步改生产；
       # debugShowCheckedModeBanner=false 已保证无 DEBUG 角标。
       - name: 构建 iOS 模拟器版
         run: |
           set -euo pipefail
           flutter build ios --simulator --no-codesign
-          APP="build/ios/simulator/Debug-iphonesimulator/Runner.app"
-          test -d "$APP" || { echo "::error::未找到 $APP"; find build/ios/simulator -maxdepth 4 -type d; exit 1; }
+          # Flutter 3.41 模拟器产物路径是 build/ios/iphonesimulator/Runner.app，
+          # 不是旧版的 build/ios/simulator/Debug-iphonesimulator/。
+          APP="build/ios/iphonesimulator/Runner.app"
+          test -d "$APP" || { echo "::error::未找到 $APP"; find build/ios -maxdepth 4 -type d -name '*.app'; exit 1; }
           echo "APP=$APP" >> "$GITHUB_ENV"
 
       - name: 启动 iPad Pro 13 英寸模拟器
