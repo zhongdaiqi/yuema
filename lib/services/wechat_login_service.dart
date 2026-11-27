@@ -13,7 +13,7 @@
  * iOS 回跳三处必须一致（缺一不可，否则授权后无法回到 App）：
  *   1) 微信开放平台后台 Universal Links：https://yuema.zuime.com/app/
  *   2) 服务端 AASA：https://yuema.zuime.com/.well-known/apple-app-site-association
- *      appIDs 需含 <TEAMID>.com.zuime.yuema，paths 覆盖 /app/*
+ *      appIDs 需含 <TEAMID>.com.zuime.yuema，paths 覆盖 /app/ 下的路径
  *   3) ios/Runner/Runner.entitlements 的 applinks:yuema.zuime.com
  *   URL Scheme = 微信开放平台 AppID（wxff760c510b1c8b20），见 Info.plist。
  *
